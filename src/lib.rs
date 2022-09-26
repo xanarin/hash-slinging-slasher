@@ -5,6 +5,15 @@ pub mod sha2 {
         pub state: [u32; 8],
     }
 
+    impl Default for SHA256 {
+        fn default() -> SHA256 {
+            SHA256{
+                state: [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
+            }
+        }
+    }
+
     impl SHA256 {
         fn prepare_input(input: &mut Vec<u8>) {
             // Note: This function only works on byte-sized payloads and does not accept a number of
@@ -38,26 +47,20 @@ pub mod sha2 {
             // Concat state (in BE) into final output
             let mut output: Vec<u8> = vec![];
             for i in 0..self.state.len() {
-                let val = self.state[i].to_be_bytes();
-                for j in 0..4 {
-                    output.push(val[j]);
-                }
+                output.extend(&self.state[i].to_be_bytes());
             }
             output
         }
 
-        pub fn from(input: &Vec<u8>) -> Result<SHA256, String> {
+        pub fn from(input: &[u8]) -> SHA256 {
             // todo: Can we replace this with a COW data structure so we don't have to duplicate
             // data?
-            let mut in_data = input.clone();
+            let mut in_data = input.to_owned();
             SHA256::prepare_input(&mut in_data);
 
             // Initialize hash state (first 32 bits of the fractional parts of the square roots of
             // the first 8 primes 2..19)
-            let mut hasher: SHA256 = SHA256{
-                state: [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
-            };
+            let mut hasher: SHA256 = SHA256{..Default::default()};
 
             // Initialize round constants (first 32 bits of the fractional parts of the cube roots
             // of the first 64 primes 2..311)
@@ -135,7 +138,7 @@ pub mod sha2 {
                 hasher.state[6] = hasher.state[6].wrapping_add(g);
                 hasher.state[7] = hasher.state[7].wrapping_add(h);
             }
-            Ok(hasher)
+            hasher
         }
 
 
@@ -149,14 +152,14 @@ mod tests {
 
     #[test]
     fn sha256_empty() {
-        assert_eq!(sha2::SHA256::from(&vec![]).unwrap().hash(),
+        assert_eq!(sha2::SHA256::from(&vec![]).hash(),
             hex::decode("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855").unwrap()
         );
     }
 
     #[test]
     fn sha256_hello_world() {
-        assert_eq!(sha2::SHA256::from(&b"hello world".to_vec()).unwrap().hash(),
+        assert_eq!(sha2::SHA256::from(&b"hello world".to_vec()).hash(),
             hex::decode("B94D27B9934D3E08A52E52D7DA7DABFAC484EFE37A5380EE9088F7ACE2EFCDE9").unwrap()
         );
     }
@@ -164,19 +167,23 @@ mod tests {
     #[test]
     fn sha256_large() {
         assert_eq!(
-            sha2::SHA256::from(&b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu".to_vec()).unwrap().hash(),
+            sha2::SHA256::from(&b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu".to_vec()).hash(),
             hex::decode("CF5B16A778AF8380036CE59E7B0492370B249B11E8F07A51AFAC45037AFEE9D1").unwrap()
         );
+
+        let one_million_a = (0..1_000_000).map(|_| b'a').collect::<Vec<u8>>();
+        assert_eq!(sha2::SHA256::from(&one_million_a).hash(),
+            hex::decode("CDC76E5C9914FB9281A1C7E284D73E67F1809A48A497200E046D39CCC7112CD0").unwrap());
     }
 
     #[test]
     fn sha256_nist_vectors() {
         // These are the official SHA vectors from NIST:
         // http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf
-        assert_eq!(sha2::SHA256::from(&b"abc".to_vec()).unwrap().hash(),
+        assert_eq!(sha2::SHA256::from(&b"abc".to_vec()).hash(),
             hex::decode("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD").unwrap());
         assert_eq!(
-            hex::encode(sha2::SHA256::from(&b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".to_vec()).unwrap().hash()).to_uppercase(),
+            hex::encode(sha2::SHA256::from(&b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".to_vec()).hash()).to_uppercase(),
             "248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1");
     }
 }

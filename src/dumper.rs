@@ -2,7 +2,7 @@
 pub fn hexdump(input: &Vec<u8>) -> String {
     let mut result = String::from("");
     for i in 0..(input.len() + input.len() % 16) / 16 {
-        let mut line: String = String::from(format!("{:08X} ", i * 16));
+        let mut line: String = format!("{:08X} ", i * 16);
         // Write the hexdump
         for j in 0..16 {
             // If in range, print a character. If not, print a space
@@ -10,7 +10,7 @@ pub fn hexdump(input: &Vec<u8>) -> String {
                 input.get(i * 16 + j).map_or_else(|| String::from("   "), |v| format!("{:02X} ", v))
             );
             if j == 7 {
-                line.push_str(" ");
+                line.push(' ');
             }
         };
         // Write the ASCII
@@ -42,11 +42,7 @@ pub fn hexdump_512(input: [u32; 64]) -> String {
 }
 
 pub fn bindump_512(input: [u32; 64]) -> String {
-    let mut output_str = String::from("");
-    for i in 0..input.len() {
-        output_str = format!("{}{}\n", output_str, u32_to_bin_str(input[i]));
-    }
-    output_str
+    input.iter().map(|v| u32_to_bin_str(*v)).collect::<Vec<String>>().join("\n")
 }
 
 //pub fn vec32_to_8_be(input: &Vec<u32>) -> Vec<u8> {
@@ -93,17 +89,3 @@ pub fn bindump(input: &Vec<u8>) -> String {
     };
     result
 }
-
-//pub fn bindump_read<T: std::io::Read>(input: T) -> Result<String, std::io::Error>{
-    //let mut result = String::from("");
-    //let mut buffer: [u8; 4096] = [0; 4096];
-    //loop {
-        //let bytes_read = input.read(&mut buffer)?;
-        //if bytes_read == 0 {
-            //break
-        //}
-        //let read_vec = vec!(buffer);
-        //result = format!("{}{}", result, bindump(&buffer[0..bytes_read].to_vec()));
-    //};
-    //Ok(result)
-//}
