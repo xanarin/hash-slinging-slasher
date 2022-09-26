@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub fn hexdump(input: &Vec<u8>) -> String {
     let mut result = String::from("");
     for i in 0..(input.len() + input.len() % 16) / 16 {
@@ -32,13 +33,13 @@ pub fn hexdump(input: &Vec<u8>) -> String {
     result
 }
 
-//pub fn hexdump_512(input: [u32; 64]) -> String {
-    //let mut output_str = String::from("");
-    //for i in 0..64/4 {
-        //output_str = format!("{}{}\n", output_str, input[i*4..(i + 1)*4].iter().map(|v| format!("{:08X} ", v)).collect::<String>());
-    //}
-    //output_str
-//}
+pub fn hexdump_512(input: [u32; 64]) -> String {
+    let mut output_str = String::from("");
+    for i in 0..64/4 {
+        output_str = format!("{}{}\n", output_str, input[i*4..(i + 1)*4].iter().map(|v| format!("{:08X} ", v)).collect::<String>());
+    }
+    output_str
+}
 
 pub fn bindump_512(input: [u32; 64]) -> String {
     let mut output_str = String::from("");
