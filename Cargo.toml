@@ -12,6 +12,7 @@ name = "slasher"
 path = "src/bin.rs"
 
 [dependencies]
+clap = { version = "4.0.26", features = ["derive"] }
 hex = "0.4.3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
