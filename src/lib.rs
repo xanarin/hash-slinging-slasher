@@ -189,11 +189,12 @@ pub mod sha2 {
 #[cfg(test)]
 mod tests {
     use super::sha2;
+    use std::io::Cursor;
 
     #[test]
     fn sha256_empty() {
         assert_eq!(
-            sha2::SHA256::hash(&mut [].as_slice()),
+            sha2::SHA256::hash(Cursor::new(vec![])),
             hex::decode("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855")
                 .unwrap()
         );
@@ -202,7 +203,7 @@ mod tests {
     #[test]
     fn sha256_hello_world() {
         assert_eq!(
-            sha2::SHA256::hash(&mut b"hello world".as_slice()),
+            sha2::SHA256::hash(Cursor::new(b"hello world".to_vec())),
             hex::decode("B94D27B9934D3E08A52E52D7DA7DABFAC484EFE37A5380EE9088F7ACE2EFCDE9")
                 .unwrap()
         );
@@ -210,15 +211,15 @@ mod tests {
 
     #[test]
     fn sha256_large() {
-        let mut alphabet_input = b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu".as_slice();
+        let alphabet_input = b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu".to_vec();
         assert_eq!(
-            sha2::SHA256::hash(&mut alphabet_input),
+            sha2::SHA256::hash(Cursor::new(alphabet_input)),
             hex::decode("CF5B16A778AF8380036CE59E7B0492370B249B11E8F07A51AFAC45037AFEE9D1").unwrap()
         );
 
         let one_million_a = (0..1_000_000).map(|_| b'a').collect::<Vec<u8>>();
         assert_eq!(
-            sha2::SHA256::hash(&*one_million_a),
+            sha2::SHA256::hash(Cursor::new(one_million_a)),
             hex::decode("CDC76E5C9914FB9281A1C7E284D73E67F1809A48A497200E046D39CCC7112CD0")
                 .unwrap()
         );
@@ -229,16 +230,14 @@ mod tests {
         // These are the official SHA vectors from NIST:
         // http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf
         assert_eq!(
-            sha2::SHA256::hash(&mut b"abc".as_slice()),
-            hex::decode("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD")
-                .unwrap()
+            sha2::SHA256::hash(Cursor::new(b"abc".to_vec())),
+            hex::decode("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD").unwrap()
         );
+
+        let input = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".to_vec();
         assert_eq!(
-            hex::encode(sha2::SHA256::hash(
-                &mut b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".as_slice()
-            ))
-            .to_uppercase(),
-            "248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1"
+            sha2::SHA256::hash(Cursor::new(input)),
+            hex::decode("248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1").unwrap()
         );
     }
 }
