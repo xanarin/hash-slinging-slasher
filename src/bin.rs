@@ -2,44 +2,25 @@ use hash_slinging_slasher::sha2;
 use std::fs::File;
 use std::io;
 
-use clap::Parser;
+use argh::FromArgs;
 
-#[derive(Parser)]
-#[command(author, version, about = "sha256sum replacement")]
-struct Cli {
-    /// File(s) to be read. If no file or "-" is specified, STDIN will be read.
-    #[arg(value_name = "FILE")]
+const PROGNAME: &str = env!("CARGO_BIN_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Compute and check SHA256 message digests
+#[derive(FromArgs, Debug)]
+struct CliArgs {
+    /// file(s) to be read. If no file or "-" is specified, STDIN will be read.
+    #[argh(positional, arg_name="FILE")]
     files: Vec<String>,
 
-    /// End each output line with NUL, not newline
-    #[arg(short, long)]
-    zero: bool,
+    /// read checksums from the FILEs and check them
+    #[argh(switch, short='c')]
+    checksum: bool,
 
-    // TODO: Implement checksum options
-    // Checksum options
-    /// Read checksums from the FILEs and check them
-    #[arg(short, long)]
-    check: bool,
-
-    /// (When checksumming) don't fail or report status for missing files
-    #[arg(long)]
-    ignore_missing: bool,
-
-    /// (When checksumming) don't print OK for each successfully verified file
-    #[arg(long)]
-    quiet: bool,
-
-    /// (When checksumming) don't output anything, status code shows success
-    #[arg(long)]
-    status: bool,
-
-    /// (When checksumming) exit non-zero for improperly formatted checksum lines
-    #[arg(long)]
-    strict: bool,
-
-    /// (When checksumming) warn about improperly formatted checksum lines
-    #[arg(long)]
-    warn: bool,
+    /// show version and exit
+    #[argh(switch, short='V')]
+    version: bool,
 }
 
 fn digest_file(path: String) -> io::Result<String> {
@@ -133,8 +114,12 @@ fn validate_checksum_file(checksum_path: String) -> Result<(), ()> {
 }
 
 fn main() {
-    let mut args = Cli::parse();
-    let mut has_errored = false;
+    let mut args: CliArgs = argh::from_env();
+
+    if args.version {
+        println!("{} {}", PROGNAME, VERSION);
+        std::process::exit(0);
+    }
 
     // If there are no specified files, default to STDIN
     match args.files.is_empty() {
@@ -142,10 +127,9 @@ fn main() {
         false => ()
     };
 
-    let line_delim = if args.zero {"\0"}  else {"\n"};
-    
+    let mut has_errored = false;
     for file_path in args.files {
-        if args.check {
+        if args.checksum {
             match validate_checksum_file(file_path) {
                 Ok(_) => (),
                 Err(_) => {
@@ -155,9 +139,9 @@ fn main() {
         } else {
             let digest = digest_file(String::from(&file_path));
             match digest {
-                Ok(result) => print!("{}  {}{}", result, &file_path, line_delim),
+                Ok(result) => println!("{}  {}", result, &file_path),
                 Err(error) => {
-                    print!("Error reading {}: {}{}", file_path, error, line_delim);
+                    println!("Error reading {}: {}", file_path, error);
                     has_errored = true;
                 },
             };
