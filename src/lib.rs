@@ -1,6 +1,5 @@
 mod dumper;
 
-
 pub mod sha2 {
     use std::io::prelude::*;
     use std::io::BufReader;
@@ -23,6 +22,9 @@ pub mod sha2 {
     }
 
     impl SHA256 {
+        // Number of bytes in a digest for this algorithm
+        pub const HASH_LEN: usize = 32;
+
         // SHA256 round constants (first 32 bits of the fractional parts of the cube roots
         // of the first 64 primes 2..311)
         const ROUND_CONSTANTS: [u32; 64] = [
