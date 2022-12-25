@@ -12,6 +12,7 @@ name = "slasher"
 path = "src/bin.rs"
 
 [dependencies]
+argh = "0.1.9"
 hex = "0.4.3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
