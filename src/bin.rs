@@ -7,6 +7,15 @@ use argh::FromArgs;
 const PROGNAME: &str = env!("CARGO_BIN_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// General Notes on this file:
+//
+// The error handling in the functions below may look odd. It is currently
+// implemented as such to mirror the behavior of GNU sha256sum. Almost all
+// errors are non-critical (all remaining files will still be
+// checksummed/verified) and the most important indicator of failure is the
+// program's exit code. This is why errors are handled locally with
+// `eprintf!()`s and the Result enum types are both ().
+
 /// Compute and check SHA256 message digests
 #[derive(FromArgs, Debug)]
 struct CliArgs {
