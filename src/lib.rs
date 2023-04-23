@@ -4,27 +4,58 @@ pub mod sha2 {
     use std::io::prelude::*;
     use std::io::BufReader;
 
-    pub struct SHA256 {
-        pub state: [u32; 8],
-    }
+    pub struct SHA256;
+    impl SHA256 {
+        /// Number of bytes in a digest for this algorithm
+        pub const HASH_LEN: usize = 32;
 
-    impl Default for SHA256 {
-        fn default() -> SHA256 {
-            SHA256 {
-                // These are the first 32 bits of the fractional parts of the square roots of the
-                // first 8 primes 2..19, according to the SHA256 spec
-                state: [
-                    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
-                    0x1f83d9ab, 0x5be0cd19,
-                ],
-            }
+        /// Initial values to seed state - defined by RFC6234
+        const IV: [u32; 8] = [
+            // These are the first 32 bits of the fractional parts of the square roots of the
+            // first 8 primes 2..19, according to Wikipedia
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+            0x5be0cd19,
+        ];
+
+        /// Calculate a SHA256 digest of some finite input data
+        pub fn hash<T: std::io::Read>(input: T) -> Vec<u8> {
+            // We can return the result of the underlying SHA256 implementation directly since we
+            // don't need to truncate the resulting hash (unlike SHA224)
+            _SHA256::hash(SHA256::IV, input)
         }
     }
 
-    impl SHA256 {
-        // Number of bytes in a digest for this algorithm
-        pub const HASH_LEN: usize = 32;
+    pub struct SHA224;
+    impl SHA224 {
+        /// Number of bytes in a digest for this algorithm
+        pub const HASH_LEN: usize = 28;
 
+        /// Initial values to seed state - defined by RFC6234
+        const IV: [u32; 8] = [
+            // The second 32 bits of the fractional parts of the square roots of the 9th through
+            // 16th primes 23..53, according to Wikipedia
+            0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7,
+            0xbefa4fa4,
+        ];
+
+        pub fn hash<T: std::io::Read>(input: T) -> Vec<u8> {
+            let mut full_hash = _SHA256::hash(SHA224::IV, input);
+            assert_eq!(full_hash.len(), SHA256::HASH_LEN,
+                       "Returned hash had {} bits when {} were expected",
+                       full_hash.len() * 8, SHA256::HASH_LEN);
+            full_hash.truncate(SHA224::HASH_LEN);
+            full_hash
+        }
+    }
+
+
+
+    /// This is the underlying implementation of SHA256 that is intended to only be used by the public
+    /// structs in this module.
+    struct _SHA256 {
+        pub state: [u32; 8],
+    }
+    impl _SHA256 {
         // SHA256 round constants (first 32 bits of the fractional parts of the cube roots
         // of the first 64 primes 2..311)
         const ROUND_CONSTANTS: [u32; 64] = [
@@ -39,6 +70,16 @@ pub mod sha2 {
             0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
             0xc67178f2,
         ];
+
+        // Function name taken from RFC6234
+        fn ssig0(input: u32) -> u32 {
+            input.rotate_right(7) ^ input.rotate_right(18) ^ input.wrapping_shr(3)
+        }
+
+        // Function name taken from RFC6234
+        fn ssig1(input: u32) -> u32 {
+            input.rotate_right(17) ^ input.rotate_right(19) ^ input.wrapping_shr(10)
+        }
 
         fn prepare_input(input: &mut Vec<u8>, bytes_read: usize) {
             // Note: This function only works on byte-sized payloads and does not accept a number of
@@ -57,18 +98,8 @@ pub mod sha2 {
             input.extend_from_slice(&(bytes_read as u64 * 8).to_be_bytes());
         }
 
-        // Function name taken from RFC6234
-        fn ssig0(input: u32) -> u32 {
-            input.rotate_right(7) ^ input.rotate_right(18) ^ input.wrapping_shr(3)
-        }
-
-        // Function name taken from RFC6234
-        fn ssig1(input: u32) -> u32 {
-            input.rotate_right(17) ^ input.rotate_right(19) ^ input.wrapping_shr(10)
-        }
-
         // Takes a 64-byte (512-bit) chunk of data to be hashed
-        fn update_state(self: &mut SHA256, input: &[u8; 64]) {
+        fn update_state(self: &mut _SHA256, input: &[u8; 64]) {
             // 1 - Compute message schedule
             // 1a - copy data from input
             let mut message_schedule: [u32; 64] = [0; 64];
@@ -83,9 +114,9 @@ pub mod sha2 {
             for i in 16..64 {
                 // Wrapping add is used here because these values are allowed to overflow and wrap
                 // back around
-                message_schedule[i] = SHA256::ssig1(message_schedule[i - 2])
+                message_schedule[i] = _SHA256::ssig1(message_schedule[i - 2])
                     .wrapping_add(message_schedule[i - 7])
-                    .wrapping_add(SHA256::ssig0(message_schedule[i - 15]))
+                    .wrapping_add(_SHA256::ssig0(message_schedule[i - 15]))
                     .wrapping_add(message_schedule[i - 16]);
             }
 
@@ -106,7 +137,7 @@ pub mod sha2 {
                 let temp1 = h
                     .wrapping_add(s1)
                     .wrapping_add(ch)
-                    .wrapping_add(SHA256::ROUND_CONSTANTS[i])
+                    .wrapping_add(_SHA256::ROUND_CONSTANTS[i])
                     .wrapping_add(message_schedule[i]);
                 let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
                 let maj = (a & b) ^ (a & c) ^ (b & c);
@@ -134,7 +165,7 @@ pub mod sha2 {
         }
 
         // Calculate hash from the current state
-        fn calculate_hash(self: &SHA256) -> Vec<u8> {
+        fn calculate_hash(self: &_SHA256) -> Vec<u8> {
             // Concat state (in BE) into final output
             let mut output: Vec<u8> = vec![];
             for i in 0..self.state.len() {
@@ -143,14 +174,14 @@ pub mod sha2 {
             output
         }
 
-        pub fn hash<T: std::io::Read>(input: T) -> Vec<u8> {
+        pub fn hash<T: std::io::Read>(init_values: [u32; 8], input: T) -> Vec<u8> {
             let mut reader = BufReader::new(input);
             let mut read_buf: [u8; 64] = [0; 64];
             let mut data_size = 0;
 
             // Initialize hash state 
-            let mut hasher: SHA256 = SHA256 {
-                ..Default::default()
+            let mut hasher = _SHA256 {
+                state: init_values,
             };
 
             loop {
@@ -166,7 +197,7 @@ pub mod sha2 {
                     // multiple times (potentially)
                     let mut trailer_buf = read_buf[..bytes_read].to_vec();
 
-                    SHA256::prepare_input(&mut trailer_buf, data_size);
+                    _SHA256::prepare_input(&mut trailer_buf, data_size);
 
                     // From this point on, this should happen for each 512 bit (64 byte) chunk of input
                     for block_count in 0..trailer_buf.len()/64 {
@@ -188,15 +219,73 @@ pub mod sha2 {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
-    use super::sha2;
+    use super::sha2::{SHA224, SHA256};
     use std::io::Cursor;
 
+    ///////////////////
+    // SHA-224 tests //
+    ///////////////////
+    #[test]
+    fn sha224_empty() {
+        assert_eq!(
+            SHA224::hash(Cursor::new(vec![])),
+            hex::decode("D14A028C2A3A2BC9476102BB288234C415A2B01F828EA62AC5B3E42F")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn sha224_hello_world() {
+        assert_eq!(
+            SHA224::hash(Cursor::new(b"hello world".to_vec())),
+            hex::decode("2F05477FC24BB4FAEFD86517156DAFDECEC45B8AD3CF2522A563582B")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn sha224_large() {
+        // These are all printable ASCII characters
+        let ascii_input = r##"!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"##.as_bytes();
+        assert_eq!(
+            SHA224::hash(Cursor::new(ascii_input)),
+            hex::decode("A078924D5C0DFE0AD9B1F402FB7A9428ABCF522D6E7DBB64E7C32644").unwrap()
+        );
+
+        let one_million_a = (0..1_000_000).map(|_| b'a').collect::<Vec<u8>>();
+        assert_eq!(
+            SHA224::hash(Cursor::new(one_million_a)),
+            hex::decode("20794655980C91D8BBB4C1EA97618A4BF03F42581948B2EE4EE7AD67")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn sha224_nist() {
+        // These are the official SHA vectors from NIST:
+        // http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf
+        assert_eq!(
+            SHA224::hash(Cursor::new(b"abc".to_vec())),
+            hex::decode("23097D223405D8228642A477BDA255B32AADBCE4BDA0B3F7E36C9DA7").unwrap()
+        );
+
+        let input = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".to_vec();
+        assert_eq!(
+            SHA224::hash(Cursor::new(input)),
+            hex::decode("75388B16512776CC5DBA5DA1FD890150B0C6455CB4F58B1952522525").unwrap()
+        );
+    }
+
+    ///////////////////
+    // SHA-256 tests //
+    ///////////////////
     #[test]
     fn sha256_empty() {
         assert_eq!(
-            sha2::SHA256::hash(Cursor::new(vec![])),
+            SHA256::hash(Cursor::new(vec![])),
             hex::decode("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855")
                 .unwrap()
         );
@@ -205,7 +294,7 @@ mod tests {
     #[test]
     fn sha256_hello_world() {
         assert_eq!(
-            sha2::SHA256::hash(Cursor::new(b"hello world".to_vec())),
+            SHA256::hash(Cursor::new(b"hello world".to_vec())),
             hex::decode("B94D27B9934D3E08A52E52D7DA7DABFAC484EFE37A5380EE9088F7ACE2EFCDE9")
                 .unwrap()
         );
@@ -213,15 +302,16 @@ mod tests {
 
     #[test]
     fn sha256_large() {
-        let alphabet_input = b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu".to_vec();
+        // These are all printable ASCII characters
+        let ascii_input = r##"!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"##.as_bytes();
         assert_eq!(
-            sha2::SHA256::hash(Cursor::new(alphabet_input)),
-            hex::decode("CF5B16A778AF8380036CE59E7B0492370B249B11E8F07A51AFAC45037AFEE9D1").unwrap()
+            SHA256::hash(Cursor::new(ascii_input)),
+            hex::decode("4E50F468889F027F80ED19724951A2F576FA61E04C27DBE9EC988F506B591FE5").unwrap()
         );
 
         let one_million_a = (0..1_000_000).map(|_| b'a').collect::<Vec<u8>>();
         assert_eq!(
-            sha2::SHA256::hash(Cursor::new(one_million_a)),
+            SHA256::hash(Cursor::new(one_million_a)),
             hex::decode("CDC76E5C9914FB9281A1C7E284D73E67F1809A48A497200E046D39CCC7112CD0")
                 .unwrap()
         );
@@ -232,13 +322,13 @@ mod tests {
         // These are the official SHA vectors from NIST:
         // http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf
         assert_eq!(
-            sha2::SHA256::hash(Cursor::new(b"abc".to_vec())),
+            SHA256::hash(Cursor::new(b"abc".to_vec())),
             hex::decode("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD").unwrap()
         );
 
         let input = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".to_vec();
         assert_eq!(
-            sha2::SHA256::hash(Cursor::new(input)),
+            SHA256::hash(Cursor::new(input)),
             hex::decode("248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1").unwrap()
         );
     }
