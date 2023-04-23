@@ -1,3 +1,3 @@
-pub mod sha256;
+mod sha2;
 
-pub use sha256::{SHA224,SHA256};
+pub use sha2::{SHA224,SHA256};
