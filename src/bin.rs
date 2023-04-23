@@ -1,4 +1,4 @@
-use hash_slinging_slasher::sha2;
+use hash_slinging_slasher::SHA256;
 use std::fs::File;
 use std::io;
 
@@ -39,7 +39,7 @@ fn digest_file(path: String) -> io::Result<String> {
         Box::new(File::open(&path)?)
     };
 
-    Ok(sha2::SHA256::hash(file)
+    Ok(SHA256::hash(file)
          // Convert vector of bytes to hex string
          .iter()
          .map(|v| format!("{:02x}", v))
@@ -91,7 +91,7 @@ fn validate_checksum_file(checksum_path: String) -> Result<(), ()> {
 
         // Ensure that hash length is correct (the multiplication by 2 is necessary because these
         // are ASCII-hex encoded bytes)
-        if expected_checksum.len() != sha2::SHA256::HASH_LEN * 2 {
+        if expected_checksum.len() != SHA256::HASH_LEN * 2 {
             eprintln!("Failed to parse line {}:{} due to malformed line: Invalid hash length", checksum_path, idx + 1);
             did_error = true;
             continue;
