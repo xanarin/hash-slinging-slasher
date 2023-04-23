@@ -1,4 +1,4 @@
-use hash_slinging_slasher::sha2::SHA256;
+use hash_slinging_slasher::SHA256;
 use std::fs::File;
 use std::io;
 
